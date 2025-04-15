@@ -6,13 +6,13 @@ using System.Text;
 using System.Threading.Tasks;
 using EF_project.Data;
 using EF_project.Entitty;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Org.BouncyCastle.Asn1.Mozilla;
 
 namespace EF_project
 {
     internal class WorkDb
     {
-        #region Private methods
 
         private bool EnsureUserIsAdmin(User user)
         {
@@ -23,6 +23,8 @@ namespace EF_project
             Console.WriteLine("You are not admin, so you cannot do this");
             return false;
         }
+
+        #region Status
 
         private void CreateHelpTables()
         {
@@ -68,6 +70,40 @@ namespace EF_project
                 });
 
                 context.SaveChanges();
+            }
+        }
+
+        public StatusSession GetStatusSessionByName(string name)
+        {
+            using (var context = new AppDbContext())
+            {
+                var statusSession = context.StatusSessions.FirstOrDefault(s => s.Status == name);
+                if (statusSession != null)
+                {
+                    return statusSession;
+                }
+                else
+                {
+                    Console.WriteLine("Status not found");
+                    return null;
+                }
+            }
+        }
+
+        public StatusTicket GetStatusTicketByName(string name)
+        {
+            using (var context = new AppDbContext())
+            {
+                var statusSession = context.StatusTickets.FirstOrDefault(s => s.Status == name);
+                if (statusSession != null)
+                {
+                    return statusSession;
+                }
+                else
+                {
+                    Console.WriteLine("Status not found");
+                    return null;
+                }
             }
         }
 
@@ -137,6 +173,23 @@ namespace EF_project
             }
         }
 
+        public User FindUserByEmail(string email)
+        {
+            using (var context = new AppDbContext())
+            {
+                var user = context.Users.FirstOrDefault(u => u.Email == email);
+                if (user != null)
+                {
+                    return user;
+                }
+                else
+                {
+                    Console.WriteLine("User not found");
+                    return null;
+                }
+            }
+        }
+
         #endregion
 
         #region Add/Remove/Update Films
@@ -189,6 +242,23 @@ namespace EF_project
                     {
                         Console.WriteLine("Film not found");
                     }
+                }
+            }
+        }
+
+        public Film GetFilmByName(string name)
+        {
+            using (var context = new AppDbContext())
+            {
+                var film = context.Films.FirstOrDefault(f => f.Name == name);
+                if (film != null)
+                {
+                    return film;
+                }
+                else
+                {
+                    Console.WriteLine("Film not found");
+                    return null;
                 }
             }
         }
@@ -398,6 +468,185 @@ namespace EF_project
                     else
                     {
                         Console.WriteLine("Film not found");
+                    }
+                }
+            }
+        }
+
+        #endregion
+
+        #region Add/Remove/Update Halls
+
+        public void AddHall(Hall hall, User user)
+        {
+            using (var context = new AppDbContext())
+            {
+                if (EnsureUserIsAdmin(user))
+                {
+                    context.Halls.Add(hall);
+                    context.SaveChanges();
+                }
+            }
+        }
+
+        public void RemoveHall(Hall hall, User user)
+        {
+            using (var context = new AppDbContext())
+            {
+                if (EnsureUserIsAdmin(user))
+                {
+                    var hallToRemove = context.Halls.FirstOrDefault(h => h.Id == hall.Id);
+                    if (hallToRemove != null)
+                    {
+                        context.Halls.Remove(hallToRemove);
+                        context.SaveChanges();
+                    }
+                    else
+                    {
+                        Console.WriteLine("Hall not found");
+                    }
+                }
+            }
+        }
+
+        public void UpdateHall(Hall hall, User user)
+        {
+            using (var context = new AppDbContext())
+            {
+                if (EnsureUserIsAdmin(user))
+                {
+                    var hallToUpdate = context.Halls.FirstOrDefault(h => h.Id == hall.Id);
+                    if (hallToUpdate != null)
+                    {
+                        hallToUpdate.IsVip = hall.IsVip;
+                        hallToUpdate.Seats = hall.Seats;
+                        context.SaveChanges();
+                    }
+                    else
+                    {
+                        Console.WriteLine("Hall not found");
+                    }
+                }
+            }
+        }
+
+        public Hall GetHallById(int id)
+        {
+            using (var context = new AppDbContext())
+            {
+                var hall = context.Halls.FirstOrDefault(h => h.Id == id);
+                if (hall != null)
+                {
+                    return hall;
+                }
+                else
+                {
+                    Console.WriteLine("Hall not found");
+                    return null;
+                }
+            }
+        }
+
+        #endregion
+
+        #region Add/Remove/Update Sessions
+
+        public void AddSession(Session session, User user)
+        {
+            using (var context = new AppDbContext())
+            {
+                if (EnsureUserIsAdmin(user))
+                {
+                    context.Sessions.Add(session);
+                    context.SaveChanges();
+                }
+            }
+        }
+
+        public void RemoveSession(Session session, User user)
+        {
+            using (var context = new AppDbContext())
+            {
+                if(EnsureUserIsAdmin(user))
+                {
+                    var sessionToRemove = context.Sessions.FirstOrDefault(s => s.Id == session.Id);
+                    if (sessionToRemove != null)
+                    {
+                        context.Sessions.Remove(sessionToRemove);
+                        context.SaveChanges();
+                    }
+                    else
+                    {
+                        Console.WriteLine("Session not found");
+                    }
+                }
+            }
+        }
+
+        #endregion
+
+        #region Add/Remove/Update Tickets
+
+        public void AddTicket(Ticket ticket, User user)
+        {
+            using (var context = new AppDbContext())
+            {
+                if (EnsureUserIsAdmin(user))
+                {
+                    context.Tickets.Add(ticket);
+                    context.SaveChanges();
+                }
+            }
+        }
+
+        public void RemoveTicket(Ticket ticket, User user)
+        {
+            using (var context = new AppDbContext())
+            {
+                if (EnsureUserIsAdmin(user))
+                {
+                    var ticketToRemove = context.Tickets.FirstOrDefault(t => t.Id == ticket.Id);
+                    if (ticketToRemove != null)
+                    {
+                        context.Tickets.Remove(ticketToRemove);
+                        context.SaveChanges();
+                    }
+                    else
+                    {
+                        Console.WriteLine("Ticket not found");
+                    }
+                }
+            }
+        }
+
+        #endregion
+
+        #region Add/Remove/Update Sales
+
+        public void AddSale(Sale sale)
+        {
+            using (var context = new AppDbContext())
+            {
+                context.Sales.Add(sale);
+                context.SaveChanges();
+            }
+        }
+
+        public void RemoveSale(Sale sale, User user)
+        {
+            using (var context = new AppDbContext())
+            {
+                if (EnsureUserIsAdmin(user))
+                {
+                    var saleToRemove = context.Sales.FirstOrDefault(s => s.Id == sale.Id);
+                    if (saleToRemove != null)
+                    {
+                        context.Sales.Remove(saleToRemove);
+                        context.SaveChanges();
+                    }
+                    else
+                    {
+                        Console.WriteLine("Sale not found");
                     }
                 }
             }

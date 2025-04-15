@@ -115,3 +115,4 @@ C:\Users\kutel\source\repos\console\EF_project\obj\Debug\net9.0\refint\EF_projec
 C:\Users\kutel\source\repos\console\EF_project\obj\Debug\net9.0\EF_project.pdb
 C:\Users\kutel\source\repos\console\EF_project\obj\Debug\net9.0\EF_project.genruntimeconfig.cache
 C:\Users\kutel\source\repos\console\EF_project\obj\Debug\net9.0\ref\EF_project.dll
+C:\Users\kutel\source\repos\console\EF_project\obj\Debug\net9.0\EF_project.sourcelink.json

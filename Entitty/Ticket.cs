@@ -12,8 +12,7 @@ namespace EF_project.Entitty
         public Session Session { get; set; }
         public int SessionId { get; set; }
         public int SeatNumber { get; set; }
-        public int Price { get; set; }
-        public StatusTicket Status { get; set; }
-        public int StatusId { get; set; } 
+        public StatusTicket? Status { get; set; }
+        public int? StatusId { get; set; } 
     }
 }
