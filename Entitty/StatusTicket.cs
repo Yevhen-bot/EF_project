@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 
 namespace EF_project.Entitty
 {
+    //help-table for status of ticket
     internal class StatusTicket
     {
         public int Id { get; set; }

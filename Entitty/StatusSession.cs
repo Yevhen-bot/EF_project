@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 
 namespace EF_project.Entitty
 {
+    //Help-table for session status
     internal class StatusSession
     {
         public int Id { get; set; }
