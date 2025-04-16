@@ -348,24 +348,72 @@ internal partial class Program
                         db.ChangeStatusTicket(ticket, "Booked");
                         ticketsCount++;
                         totalPrice += ticketprice;
-                        Console.WriteLine("Your ticket is booked");
+                        db.SetPrice(ticket, ticketprice);
+                        Console.WriteLine("Your ticket is booked and it`s id is {0}", ticket.Id);
                     }
                     break;
                 case 1:
                     {
-
+                        Console.WriteLine("Sure, what ticket`s id is?");
+                        int id = int.Parse(Console.ReadLine());
+                        var ticket = db.GetTicketById(id);
+                        if (ticket == null)
+                        {
+                            Console.WriteLine("Sorry, but we can not find ticket with this id in our database");
+                            break;
+                        }
+                        if (ticket.Status.Status == "Booked")
+                        {
+                            db.ChangeStatusTicket(ticket, "Returned");
+                            ticketsCount--;
+                            totalPrice -= (int)ticket.Price;
+                            Console.WriteLine("Your ticket is returned");
+                        }
+                        else if (ticket.Status.Status == "Returned")
+                        {
+                            Console.WriteLine("Sorry, but this ticket is already returned");
+                        }
+                        else if (ticket.Status.Status == "Bought")
+                        {
+                            Console.WriteLine("Sorry, but this ticket is already bought and company policy forbids returning bought ticket");
+                        }
+                        else
+                        {
+                            Console.WriteLine("Sorry, but this ticket is not booked yet");
+                        }
                     }
                     break;
                 case 2:
                     {
-
+                        db.AddSale(new Sale
+                        {
+                            User = user,
+                            TicketsCount = ticketsCount,
+                            TotalPrice = totalPrice,
+                            SaleDate = DateTime.Now
+                        });
+                        Console.WriteLine("Thank you for your order, it is {0} total", totalPrice);
                     }
-                    break;
+                    return;
                 case 3:
                     {
+                        if(!user.IsAdmin)
+                        {
+                            Console.WriteLine("You are not admin and can not see profit");
+                            break;
+                        }
+                        Console.WriteLine("Enter start date of the period you want to see profit for");
+                        DateTime startDate = DateTime.Parse(Console.ReadLine());
+                        Console.WriteLine("Enter end date of the period you want to see profit for");
+                        DateTime endDate = DateTime.Parse(Console.ReadLine());
 
+                        var sales = db.GetSalesByPeriod(startDate, endDate);
+                        if(sales != null)
+                        {
+                            Console.WriteLine("Profit for this period is {0}", sales.Sum(s => s.TotalPrice));
+                        }
                     }
-                    break;
+                    return;
                 default:
                     {
                         Console.WriteLine("Sorry, but we don`t have this option yet");

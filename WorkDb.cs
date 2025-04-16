@@ -777,6 +777,40 @@ namespace EF_project
             }
         }
 
+        public Ticket GetTicketById(int id)
+        {
+            using (var context = new AppDbContext())
+            {
+                var ticket = context.Tickets.FirstOrDefault(t => t.Id == id);
+                if (ticket != null)
+                {
+                    return ticket;
+                }
+                else
+                {
+                    Console.WriteLine("Ticket not found");
+                    return null;
+                }
+            }
+        }
+
+        public void SetPrice(Ticket ticket, int price)
+        {
+            using (var context = new AppDbContext())
+            {
+                var ticketToUpdate = context.Tickets.FirstOrDefault(t => t.Id == ticket.Id);
+                if (ticketToUpdate != null)
+                {
+                    ticketToUpdate.Price = price;
+                    context.SaveChanges();
+                }
+                else
+                {
+                    Console.WriteLine("Ticket not found");
+                }
+            }
+        }
+
         #endregion
 
         #region Add/Remove/Update Sales
@@ -806,6 +840,25 @@ namespace EF_project
                     {
                         Console.WriteLine("Sale not found");
                     }
+                }
+            }
+        }
+
+        public Sale[] GetSalesByPeriod(DateTime start, DateTime end)
+        {
+            using (var context = new AppDbContext())
+            {
+                var sales = context.Sales
+                    .Where(s => s.SaleDate >= start && s.SaleDate <= end)
+                    .ToArray();
+                if (sales.Length == 0)
+                {
+                    Console.WriteLine("No sales found");
+                    return null;
+                }
+                else
+                {
+                    return sales;
                 }
             }
         }
