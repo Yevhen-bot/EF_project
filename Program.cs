@@ -1,17 +1,383 @@
-﻿using EF_project;
+﻿using System.Net.NetworkInformation;
+using EF_project;
 using EF_project.Entitty;
+using Google.Protobuf.WellKnownTypes;
+using Mysqlx.Crud;
 using Org.BouncyCastle.Asn1.Cmp;
 using Org.BouncyCastle.Security;
+using Org.BouncyCastle.Tls;
 
-internal class Program
+internal partial class Program
 {
+    private const int VIP_ADDER = 40;
+
     private static readonly WorkDb db = new WorkDb();
 
-    public static void PrintMainMenu()
+    #region Actions
+
+    public static void FilmAction(User user)
     {
-        Console.WriteLine("0 - films, 1 - sessions, 2 - discounts, 3 - halls, 4 - order, 5 - quit");
+        Menu.PrintFilmsMenu();
+        int answer = int.Parse(Console.ReadLine());
+        switch (answer)
+        {
+            case 0:
+                {
+                    Film film = new();
+                    Console.Write("Enter the name of the film: ");
+                    film.Name = Console.ReadLine();
+                    Console.Write("Enter the genre of the film: ");
+                    film.Genre = Console.ReadLine();
+                    Console.Write("Enter the duration of the film(in seconds): ");
+                    film.Duration = int.Parse(Console.ReadLine());
+                    Console.Write("Enter the director name: ");
+                    film.Director = Console.ReadLine();
+                    Console.Write("Enter the release date of the film: ");
+                    film.ReleaseDate = DateTime.Parse(Console.ReadLine());
+                    Console.Write("Enter the restriction of the film(0 if don`t): ");
+                    if (Console.ReadLine() != "0")
+                    {
+                        film.Restriction = int.Parse(Console.ReadLine());
+                    }
+                    Console.Write("Does film have description(y/n): ");
+                    if (Console.ReadLine() == "y")
+                    {
+                        Console.Write("Enter the description: ");
+                        film.Description = Console.ReadLine();
+                    }
+                    db.AddFilm(film, user);
+                } break;
+
+            case 1:
+                {
+                    Console.WriteLine("Enter name of the film you want to delete");
+                    string name = Console.ReadLine();
+                    db.RemoveFilm(name, user);
+                } break;
+            case 2:
+                {
+                    Console.WriteLine("Enter name of the film");
+                    string name = Console.ReadLine();
+                    Console.WriteLine("And new description");
+                    string description = Console.ReadLine();
+                    db.UpdateDescription(name, description, user);
+                } break;
+            default:
+                {
+                    Console.WriteLine("Sorry, but we don`t have this option yet");
+                } break;
+        }
     }
 
+    public static void SessionAction(User user)
+    {
+        Menu.PrintSessionsMenu();
+        int answer = int.Parse(Console.ReadLine());
+        switch (answer)
+        {
+            case 0:
+                {
+                    Console.Write("Enter the datetime of the session: ");
+                    DateTime date = DateTime.Parse(Console.ReadLine());
+                    Console.Write("Enter the hall number it will be set in: ");
+                    int hallId = int.Parse(Console.ReadLine());
+                    var hall = db.GetHallById(hallId);
+                    if (hall == null)
+                    {
+                        return;
+                    }
+                    Console.Write("Enter the name of film for the session: ");
+                    string filmName = Console.ReadLine();
+                    var film = db.GetFilmByName(filmName);
+                    if (film == null)
+                    {
+                        return;
+                    }
+                    Console.Write("Enter the price for tickets for the session: ");
+                    int price = int.Parse(Console.ReadLine());
+
+                    Console.WriteLine("The status of this session?(Planned, Ongoing, Cancelled, Finished)");
+                    string status = Console.ReadLine();
+                    var st = db.GetStatusSessionByName(status);
+                    if (status == null) return;
+
+                    var s = new Session
+                    {
+                        StartTime = date,
+                        Price = price,
+                        Hall = hall,
+                        Status = st,
+                        Film = film
+                    };
+
+                    db.AddSession(s, user);
+                    for (int j = 1; j <= hall.Seats; j++)
+                    {
+                        db.AddTicket(new Ticket
+                        {
+                            SeatNumber = j,
+                            Session = s,
+                        }, user);
+                    }
+                } break;
+            case 1:
+                {
+                    Console.WriteLine("Enter name of the film of session you want to delete");
+                    string name = Console.ReadLine();
+                    Console.WriteLine("And datetime");
+                    DateTime date = DateTime.Parse(Console.ReadLine());
+                    Console.WriteLine("And hall");
+                    int hallId = int.Parse(Console.ReadLine());
+                    var s = db.FindSession(name, hallId, date);
+                    if(s != null) db.RemoveSession(s, user);
+                } break;
+            case 2:
+                {
+                    Console.WriteLine("Enter name of the film of session");
+                    string name = Console.ReadLine();
+                    Console.WriteLine("And datetime");
+                    DateTime date = DateTime.Parse(Console.ReadLine());
+                    Console.WriteLine("And hall");
+                    int hallId = int.Parse(Console.ReadLine());
+                    var s = db.FindSession(name, hallId, date);
+                    Console.WriteLine("And new status of this session?(Planned, Ongoing, Cancelled, Finished)");
+                    string status = Console.ReadLine();
+                    var st = db.GetStatusSessionByName(status);
+                    if (s != null && st != null)
+                    {
+                        db.ChangeStatus(s, st, user);
+                    }
+                } break;
+            default:
+                {
+                    Console.WriteLine("Sorry, but we don`t have this option yet");
+                }
+                break;
+        }
+    }
+
+    public static void DiscountAction(User user)
+    {
+        Menu.PrintDiscountsMenu();
+        int answer = int.Parse(Console.ReadLine());
+        switch (answer)
+        {
+            case 0:
+                {
+                    Console.Write("Enter the name of the film: ");
+                    string name = Console.ReadLine();
+                    var film = db.GetFilmByName(name);
+                    if (film == null) return;
+                    Console.Write("Enter the discount value: ");
+                    int value = int.Parse(Console.ReadLine());
+                    Console.WriteLine("And is this discount for regulars(y/n)?");
+                    string isRegular = Console.ReadLine();
+                    if (isRegular == "y")
+                    {
+                        db.AddRegularDiscount(value, film, user);
+                    }
+                    else
+                    {
+                        db.AddDiscount(value, film, user);
+                    }
+                }
+                break;
+            case 1:
+                {
+                    Console.WriteLine("Enter name of the film of discount you want to delete");
+                    string name = Console.ReadLine();
+                    var film = db.GetFilmByName(name);
+                    if (film == null) return;
+                    Console.WriteLine("And is this discount for regulars(y/n)?");
+                    string isRegular = Console.ReadLine();
+                    if (isRegular == "y")
+                    {
+                        db.RemoveRegularDiscount(film, user);
+                    }
+                    else
+                    {
+                        db.RemoveDiscount(film, user);
+                    }
+                }
+                break;
+            default:
+                {
+                    Console.WriteLine("Sorry, but we don`t have this option yet");
+                }
+                break;
+        }
+    }
+
+    public static void HallAction(User user)
+    {
+        Menu.PrintHallsMenu();
+        int answer = int.Parse(Console.ReadLine());
+        switch (answer)
+        {
+            case 0:
+                {
+                    Console.Write("Enter how many seats does hall have: ");
+                    int seatsCount = int.Parse(Console.ReadLine());
+                    Console.Write("And is it VIP(y/n): ");
+                    string isVIP = Console.ReadLine();
+                    db.AddHall(new Hall
+                    {
+                        Seats = seatsCount,
+                        IsVip = isVIP == "y" ? true : false
+                    }, user);
+                }
+                break;
+            case 1:
+                {
+                    Console.WriteLine("Enter id of the hall you want to delete");
+                    int id = int.Parse(Console.ReadLine());
+                    db.RemoveHall(id, user);
+                }
+                break;
+            case 2:
+                {
+                    Console.WriteLine("Enter id of the hall you want to update");
+                    int id = int.Parse(Console.ReadLine());
+                    Console.Write("Enter how many seats does hall have: ");
+                    int seatsCount = int.Parse(Console.ReadLine());
+                    Console.Write("And is it VIP(y/n): ");
+                    string isVIP = Console.ReadLine();
+                    db.UpdateHall(id, seatsCount, isVIP == "y" ? true : false, user);
+                }
+                break;
+            default:
+                {
+                    Console.WriteLine("Sorry, but we don`t have this option yet");
+                }
+                break;
+        }
+    }
+
+    public static void OrderAction(User user)
+    {
+        int ticketsCount = 0;
+        int totalPrice = 0;
+        for (; ; )
+        {
+            Menu.PrintOrderMenu();
+            int answer = int.Parse(Console.ReadLine());
+            switch (answer)
+            {
+                case 0:
+                    {
+                        Console.WriteLine("Of course, on what film do you want to go?");
+                        string name = Console.ReadLine();
+                        var film = db.GetFilmByName(name);
+                        if (film == null) break;
+                        var ses = db.GetSessionsByFilm(name, user);
+                        if (ses == null)
+                        {
+                            Console.WriteLine("Sorry, but we don`t have availible sessions with this film yet");
+                            break;
+                        }
+                        Console.WriteLine("And what session do you want to go(1, 2, 3, ...)?");
+                        foreach (var s in ses)
+                        {
+                            Console.WriteLine($"{s.Id} - {s.StartTime}");
+                        }
+                        int id = int.Parse(Console.ReadLine());
+                        if(id > ses.Count() || id < 0)
+                        {
+                            Console.WriteLine("Incorrect");
+                            break;
+                        }
+                        var session = ses[id];
+
+                        int ticketprice = session.Price;
+                        Console.WriteLine("Of course!");
+                        
+                        if(db.IsRegular(user) && film.RegularDiscount != null)
+                        {
+                            Console.WriteLine($"This film has discount for regulars, and you are one of them! So ticket will be yours for {film.RegularDiscount.DiscountPercent}% cheaper!");
+                            ticketprice = (int)(ticketprice * (1 - film.RegularDiscount.DiscountPercent / 100.0));
+                        }
+                        else if(film.Discount != null)
+                        {
+                            Console.WriteLine($"This film has discount, so ticket will be yours for {film.Discount.DiscountPercent}% cheaper!");
+                            ticketprice = (int)(ticketprice * (1 - film.Discount.DiscountPercent / 100.0)); ;
+                        }
+                        else
+                        {
+                            Console.WriteLine($"There is no discounts for this film, sorry");
+                        }
+
+                        if(session.Hall.IsVip)
+                        {
+                            Console.WriteLine($"This session is in VIP hall, so ticket`s value is up for {VIP_ADDER}!");
+                            ticketprice += VIP_ADDER;
+                        }
+
+                        int bonusesToAdd = ticketprice / 10;
+                        Console.WriteLine($"You will get {bonusesToAdd} bonuses for this ticket");
+
+                        Console.WriteLine("Do you want to use your {0} bonuses(y/n)?", user.Bonuses);
+                        string answer1 = Console.ReadLine();
+                        if (answer1 == "y")
+                        {
+                            if(user.Bonuses <= ticketprice)
+                            {
+                                ticketprice -= user.Bonuses;
+                                user.Bonuses = 0;
+                            }
+                            else
+                            {
+                                user.Bonuses -= ticketprice;
+                                ticketprice = 0;
+                            }
+                        }
+
+                        Console.WriteLine("And what seat do you want to take?");
+                        var seats = session.Tickets.Where(t => t.Status.Status == null || t.Status.Status == "Returned").ToList();
+                        Console.WriteLine("Availible are: ");
+                        foreach (var t in seats)
+                        {
+                            Console.WriteLine(t.SeatNumber + " ");
+                        }
+                        int seatNumber = int.Parse(Console.ReadLine());
+                        var ticket = seats.FirstOrDefault(t => t.SeatNumber == seatNumber);
+                        if (ticket == null)
+                        {
+                            Console.WriteLine("Incorrect input");
+                            break;
+                        }
+                        db.ChangeStatusTicket(ticket, "Booked");
+                        ticketsCount++;
+                        totalPrice += ticketprice;
+                        Console.WriteLine("Your ticket is booked");
+                    }
+                    break;
+                case 1:
+                    {
+
+                    }
+                    break;
+                case 2:
+                    {
+
+                    }
+                    break;
+                case 3:
+                    {
+
+                    }
+                    break;
+                default:
+                    {
+                        Console.WriteLine("Sorry, but we don`t have this option yet");
+                    }
+                    break;
+            }
+        }
+    }
+
+    #endregion
+
+    // Easier first time initialization of the cinema
     public static User FirstTime()
     {
         Console.WriteLine("Welcome to managing your cinema!");
@@ -142,7 +508,7 @@ internal class Program
     {
         Console.OutputEncoding = System.Text.Encoding.UTF8;
 
-        Console.Write("Hello dear customer, are you here first time? (y/n): ");
+        Console.Write("Hello dear customer, are you buisness owner and here first time? (y/n): ");
         string answer = Console.ReadLine();
         User currentUser;
         if (answer == "y")
@@ -161,7 +527,25 @@ internal class Program
                 if (currentUser == null)
                 {
                     Console.WriteLine("Sorry, but we can not find you in our database");
-                    return;
+                    Console.WriteLine("Do you want to register(y/n)?");
+                    string answer1 = Console.ReadLine();
+                    if (answer1 == "y")
+                    {
+                        Console.Write("Please, say your name:");
+                        string name = Console.ReadLine();
+                        currentUser = new User
+                        {
+                            Name = name,
+                            Email = email,
+                            IsAdmin = false
+                        };
+                        db.AddUser(currentUser);
+                        break;
+                    }
+                    else
+                    {
+                        Console.WriteLine("Try again!");
+                    }
                 }
                 else break;
             }
@@ -170,7 +554,18 @@ internal class Program
         for(; ; )
         {
             Console.WriteLine("What do you want to?");
+            Menu.PrintMainMenu();
             int answer1 = int.Parse(Console.ReadLine());
+            switch (answer1)
+            {
+                case 0: FilmAction(currentUser); break;
+                case 1: SessionAction(currentUser); break;
+                case 2: DiscountAction(currentUser); break;
+                case 3: HallAction(currentUser); break;
+                case 4: OrderAction(currentUser); break;
+                case 5: Console.WriteLine("Bye bye!!!"); ; return;
+                default: Console.WriteLine("Sorry, but we don`t have this option yet"); break;
+            }
         }
 
     }

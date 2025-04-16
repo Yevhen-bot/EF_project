@@ -1,13 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel.DataAnnotations;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using EF_project.Data;
+﻿using EF_project.Data;
 using EF_project.Entitty;
-using Microsoft.EntityFrameworkCore.Diagnostics;
-using Org.BouncyCastle.Asn1.Mozilla;
+using Microsoft.EntityFrameworkCore;
 
 namespace EF_project
 {
@@ -190,6 +183,15 @@ namespace EF_project
             }
         }
 
+        public bool IsRegular(User user)
+        {
+            if (user.Sales.Count() > 3)
+            {
+                return true;
+            }
+            return false;
+        }
+
         #endregion
 
         #region Add/Remove/Update Films
@@ -206,13 +208,13 @@ namespace EF_project
             }
         }
 
-        public void RemoveFilm(Film film, User user)
+        public void RemoveFilm(string name, User user)
         {
             using (var context = new AppDbContext())
             {
                 if(EnsureUserIsAdmin(user))
                 {
-                    var filmToRemove = context.Films.FirstOrDefault(f => f.Name == film.Name);
+                    var filmToRemove = context.Films.FirstOrDefault(f => f.Name == name);
                     if (filmToRemove != null)
                     {
                         context.Films.Remove(filmToRemove);
@@ -226,13 +228,13 @@ namespace EF_project
             }
         }
 
-        public void UpdateDescription(string ds, Film film, User user)
+        public void UpdateDescription(string ds, string name, User user)
         {
             using (var context = new AppDbContext())
             {
                 if (EnsureUserIsAdmin(user))
                 {
-                    var filmToUpdate = context.Films.FirstOrDefault(f => f.Name == film.Name);
+                    var filmToUpdate = context.Films.FirstOrDefault(f => f.Name == name);
                     if (filmToUpdate != null)
                     {
                         filmToUpdate.Description = ds;
@@ -489,13 +491,13 @@ namespace EF_project
             }
         }
 
-        public void RemoveHall(Hall hall, User user)
+        public void RemoveHall(int id, User user)
         {
             using (var context = new AppDbContext())
             {
                 if (EnsureUserIsAdmin(user))
                 {
-                    var hallToRemove = context.Halls.FirstOrDefault(h => h.Id == hall.Id);
+                    var hallToRemove = context.Halls.FirstOrDefault(h => h.Id == id);
                     if (hallToRemove != null)
                     {
                         context.Halls.Remove(hallToRemove);
@@ -509,22 +511,89 @@ namespace EF_project
             }
         }
 
-        public void UpdateHall(Hall hall, User user)
+        public void UpdateHall(int id, int seats, bool isV, User user)
         {
             using (var context = new AppDbContext())
             {
                 if (EnsureUserIsAdmin(user))
                 {
-                    var hallToUpdate = context.Halls.FirstOrDefault(h => h.Id == hall.Id);
+                    var hallToUpdate = context.Halls.FirstOrDefault(h => h.Id == id);
                     if (hallToUpdate != null)
                     {
-                        hallToUpdate.IsVip = hall.IsVip;
-                        hallToUpdate.Seats = hall.Seats;
+                        hallToUpdate.IsVip = isV;
+                        if(seats <= 0)
+                        {
+                            Console.WriteLine("Seats must be more than 0");
+                            return;
+                        }
+                        if(seats < hallToUpdate.Seats)
+                        {
+                            RemoveSeats(id, seats, hallToUpdate.Seats, user);
+                        } else
+                        {
+                            AddSeats(id, seats, hallToUpdate.Seats, user);
+                        }
+
+                            hallToUpdate.Seats = seats;
                         context.SaveChanges();
                     }
                     else
                     {
                         Console.WriteLine("Hall not found");
+                    }
+                }
+            }
+        }
+
+        public void AddSeats(int Hallid, int newAofseats, int prevAsofseats, User user)
+        {
+            using (var context = new AppDbContext())
+            {
+                if (EnsureUserIsAdmin(user))
+                {
+                    var ses = context.Sessions
+                        .Include(s => s.Hall)
+                        .Include(s => s.Tickets)
+                        .Where(s => s.Hall.Id == Hallid)
+                        .ToList();
+
+                    foreach (var s in ses)
+                    {
+                        for(int i = prevAsofseats+1; i <= newAofseats; i++)
+                        {
+                            AddTicket(new Ticket
+                            {
+                                Session = s,
+                                SeatNumber = i,
+                            }, user);
+                        }
+                    }
+                }
+            }
+        }
+
+        public void RemoveSeats(int Hallid, int newAofseats, int prevAsofseats, User user)
+        {
+            using (var context = new AppDbContext())
+            {
+                if (EnsureUserIsAdmin(user))
+                {
+                    var ses = context.Sessions
+                        .Include(s => s.Hall)
+                        .Include(s => s.Tickets)
+                        .Where(s => s.Hall.Id == Hallid)
+                        .ToList();
+
+                    foreach (var s in ses)
+                    {
+                        var ticketsToRemove = s.Tickets
+                            .Where(t => t.SeatNumber > newAofseats && t.SeatNumber <= prevAsofseats)
+                            .ToList();
+
+                        foreach (var ticket in ticketsToRemove)
+                        {
+                            context.Tickets.Remove(ticket);
+                        }
                     }
                 }
             }
@@ -583,6 +652,77 @@ namespace EF_project
             }
         }
 
+        public Session FindSession(string filmname, int hallid, DateTime date)
+        {
+            using (var context = new AppDbContext())
+            {
+                var s = context.Sessions.Include(s => s.Film)
+                    .Include(s => s.Hall)
+                    .FirstOrDefault(s => s.Film.Name == filmname && s.Hall.Id == hallid && s.StartTime.Date == date.Date);
+
+                if (s == null)
+                {
+                    Console.WriteLine("Session not found");
+                    return null;
+                }
+                else
+                {
+                    return s;
+                }
+            }
+        }
+
+        public Session[] GetSessionsByFilm(string filmname, User user)
+        {
+            using (var context = new AppDbContext())
+            {
+                var sessions = context.Sessions.Include(s => s.Film)
+                    .Include(s => s.Hall)
+                    .Include(s => s.Status)
+                    .Where(s => s.Film.Name == filmname && s.Status.Status == "Planed")
+                    .ToArray();
+                
+                if (sessions.Length == 0)
+                {
+                    Console.WriteLine("No sessions found");
+                    return null;
+                }
+                else
+                {
+                    return sessions;
+                }
+            }
+        }
+
+        public void ChangeStatus(Session s, StatusSession status, User user)
+        {
+            using (var context = new AppDbContext())
+            {
+                if (EnsureUserIsAdmin(user))
+                {
+                    s.Status = status;
+                    context.SaveChanges();
+                }
+            }
+        }
+
+        public Session GetSessionById(int id)
+        {
+            using (var context = new AppDbContext())
+            {
+                var session = context.Sessions.FirstOrDefault(s => s.Id == id);
+                if (session != null)
+                {
+                    return session;
+                }
+                else
+                {
+                    Console.WriteLine("Session not found");
+                    return null;
+                }
+            }
+        }
+
         #endregion
 
         #region Add/Remove/Update Tickets
@@ -615,6 +755,24 @@ namespace EF_project
                     {
                         Console.WriteLine("Ticket not found");
                     }
+                }
+            }
+        }
+
+        public void ChangeStatusTicket(Ticket ticket, string status)
+        {
+            using (var context = new AppDbContext())
+            {
+                var ticketToUpdate = context.Tickets.FirstOrDefault(t => t.Id == ticket.Id);
+                var statusTicket = context.StatusTickets.FirstOrDefault(s => s.Status == status);
+                if (ticketToUpdate != null)
+                {
+                    ticketToUpdate.Status = statusTicket;
+                    context.SaveChanges();
+                }
+                else
+                {
+                    Console.WriteLine("Ticket not found");
                 }
             }
         }
