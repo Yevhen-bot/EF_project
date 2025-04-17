@@ -35,9 +35,10 @@ internal partial class Program
                     Console.Write("Enter the release date of the film: ");
                     film.ReleaseDate = DateTime.Parse(Console.ReadLine());
                     Console.Write("Enter the restriction of the film(0 if don`t): ");
-                    if (Console.ReadLine() != "0")
+                    var restriction = int.Parse(Console.ReadLine());
+                    if (restriction != 0)
                     {
-                        film.Restriction = int.Parse(Console.ReadLine());
+                        film.Restriction = restriction;
                     }
                     Console.Write("Does film have description(y/n): ");
                     if (Console.ReadLine() == "y")
@@ -60,7 +61,7 @@ internal partial class Program
                     string name = Console.ReadLine();
                     Console.WriteLine("And new description");
                     string description = Console.ReadLine();
-                    db.UpdateDescription(name, description, user);
+                    db.UpdateDescription(description, name, user);
                 } break;
             default:
                 {
@@ -257,6 +258,7 @@ internal partial class Program
     {
         int ticketsCount = 0;
         int totalPrice = 0;
+        List<Ticket> tickets = new();
         for (; ; )
         {
             Menu.PrintOrderMenu();
@@ -276,9 +278,9 @@ internal partial class Program
                             break;
                         }
                         Console.WriteLine("And what session do you want to go(1, 2, 3, ...)?");
-                        foreach (var s in ses)
+                        for(int i = 0; i < ses.Length; i++)
                         {
-                            Console.WriteLine($"{s.Id} - {s.StartTime}");
+                            Console.WriteLine($"{i+1} - {ses[i].StartTime}");
                         }
                         int id = int.Parse(Console.ReadLine());
                         if(id > ses.Count() || id < 0)
@@ -286,7 +288,7 @@ internal partial class Program
                             Console.WriteLine("Incorrect");
                             break;
                         }
-                        var session = ses[id];
+                        var session = ses[id-1];
 
                         int ticketprice = session.Price;
                         Console.WriteLine("Of course!");
@@ -331,13 +333,18 @@ internal partial class Program
                             }
                         }
 
+                        var seats = db.GetTicketsBySession(session);
+                        if (seats == null)
+                        {
+                            break;
+                        }
                         Console.WriteLine("And what seat do you want to take?");
-                        var seats = session.Tickets.Where(t => t.Status.Status == null || t.Status.Status == "Returned").ToList();
                         Console.WriteLine("Availible are: ");
                         foreach (var t in seats)
                         {
-                            Console.WriteLine(t.SeatNumber + " ");
+                            Console.Write(t.SeatNumber + " ");
                         }
+                        Console.WriteLine("");
                         int seatNumber = int.Parse(Console.ReadLine());
                         var ticket = seats.FirstOrDefault(t => t.SeatNumber == seatNumber);
                         if (ticket == null)
@@ -350,6 +357,8 @@ internal partial class Program
                         totalPrice += ticketprice;
                         db.SetPrice(ticket, ticketprice);
                         Console.WriteLine("Your ticket is booked and it`s id is {0}", ticket.Id);
+                        tickets.Add(ticket);
+                        db.AddBonuses(user, bonusesToAdd);
                     }
                     break;
                 case 1:
@@ -393,6 +402,10 @@ internal partial class Program
                             SaleDate = DateTime.Now
                         });
                         Console.WriteLine("Thank you for your order, it is {0} total", totalPrice);
+                        foreach(var t in tickets)
+                        {
+                            db.ChangeStatusTicket(t, "Bought");
+                        }
                     }
                     return;
                 case 3:
@@ -414,6 +427,11 @@ internal partial class Program
                         }
                     }
                     return;
+                case 4:
+                    {
+                        Console.WriteLine("Bye bye!!!");
+                        return;
+                    }
                 default:
                     {
                         Console.WriteLine("Sorry, but we don`t have this option yet");
@@ -463,20 +481,21 @@ internal partial class Program
         for (int i = 1; i <= filmsCount; i++)
         {
             Film film = new();
-            Console.Write("Enter the name of the film: ");
+            Console.Write($"Enter the name of the {i} film: ");
             film.Name = Console.ReadLine();
-            Console.Write("Enter the genre of the film: ");
+            Console.Write($"Enter the genre of the {i} film: ");
             film.Genre = Console.ReadLine();
-            Console.Write("Enter the duration of the film(in seconds): ");
+            Console.Write($"Enter the duration of the {i} film(in seconds): ");
             film.Duration = int.Parse(Console.ReadLine());
             Console.Write("Enter the director name: ");
             film.Director = Console.ReadLine();
-            Console.Write("Enter the release date of the film: ");
+            Console.Write("Enter the release date: ");
             film.ReleaseDate = DateTime.Parse(Console.ReadLine());
-            Console.Write("Enter the restriction of the film(0 if don`t): ");
-            if(Console.ReadLine() != "0")
+            Console.Write($"Enter the restriction of the {i} film(0 if don`t): ");
+            var restriction = int.Parse(Console.ReadLine());
+            if (restriction != 0)
             {
-                film.Restriction = int.Parse(Console.ReadLine());
+                film.Restriction = restriction;
             }
             Console.Write("Does film have description(y/n): ");
             if(Console.ReadLine() == "y")
@@ -491,7 +510,7 @@ internal partial class Program
         int sessionsCount = int.Parse(Console.ReadLine());
         for (int i = 1; i <= sessionsCount; i++)
         {
-            Console.Write("Enter the datetime of the session: ");
+            Console.Write($"Enter the datetime of the {i} session: ");
             DateTime date = DateTime.Parse(Console.ReadLine());
             Console.Write("Enter the hall number it will be set in: ");
             int hallId = int.Parse(Console.ReadLine());
@@ -536,9 +555,9 @@ internal partial class Program
         int workersCount = int.Parse(Console.ReadLine());
         for (int i = 1; i <= workersCount; i++)
         {
-            Console.Write("Enter the name of the worker: ");
+            Console.Write($"Enter the name of the {i} worker: ");
             string workerName = Console.ReadLine();
-            Console.Write("Enter the email of the worker: ");
+            Console.Write($"Enter the email of the {i} worker: ");
             string workerEmail = Console.ReadLine();
             db.AddUser(new User
             {
@@ -601,7 +620,7 @@ internal partial class Program
 
         for(; ; )
         {
-            Console.WriteLine("What do you want to?");
+            Console.WriteLine("What do you want to do?");
             Menu.PrintMainMenu();
             int answer1 = int.Parse(Console.ReadLine());
             switch (answer1)

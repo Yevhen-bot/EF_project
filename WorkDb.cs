@@ -25,6 +25,11 @@ namespace EF_project
             {
                 // Status-session
 
+                if(context.StatusSessions.Any() || context.StatusTickets.Any())
+                {
+                    return;
+                }
+
                 context.StatusSessions.Add(new StatusSession
                 {
                     Status = "Ongoing"
@@ -32,7 +37,7 @@ namespace EF_project
 
                 context.StatusSessions.Add(new StatusSession
                 {
-                    Status = "Canceled"
+                    Status = "Cancelled"
                 });
 
                 context.StatusSessions.Add(new StatusSession
@@ -52,12 +57,12 @@ namespace EF_project
                     Status = "Bought"
                 });
 
-                context.StatusSessions.Add(new StatusSession
+                context.StatusTickets.Add(new StatusTicket
                 {
                     Status = "Booked"
                 });
 
-                context.StatusSessions.Add(new StatusSession
+                context.StatusTickets.Add(new StatusTicket
                 {
                     Status = "Returned"
                 });
@@ -185,11 +190,29 @@ namespace EF_project
 
         public bool IsRegular(User user)
         {
+            if (user.Sales == null) return false;
             if (user.Sales.Count() > 3)
             {
                 return true;
             }
             return false;
+        }
+
+        public void AddBonuses(User user, int bonuses)
+        {
+            using (var context = new AppDbContext())
+            {
+                var userToUpdate = context.Users.FirstOrDefault(u => u.Id == user.Id);
+                if (userToUpdate != null)
+                {
+                    userToUpdate.Bonuses += bonuses;
+                    context.SaveChanges();
+                }
+                else
+                {
+                    Console.WriteLine("User not found");
+                }
+            }
         }
 
         #endregion
@@ -282,6 +305,12 @@ namespace EF_project
                 if(EnsureUserIsAdmin(user))
                 {
                     var filmToUpdate = context.Films.FirstOrDefault(f => f.Name == film.Name);
+                    if (filmToUpdate == null)
+                    {
+                        Console.WriteLine("Film not found");
+                        return;
+                    }
+                    context.Attach(filmToUpdate);
                     if (filmToUpdate != null)
                     {
                         if(filmToUpdate.Discount != null)
@@ -322,6 +351,12 @@ namespace EF_project
                 if (EnsureUserIsAdmin(user))
                 {
                     var filmToUpdate = context.Films.FirstOrDefault(f => f.Name == film.Name);
+                    if (filmToUpdate == null)
+                    {
+                        Console.WriteLine("Film not found");
+                        return;
+                    }
+                    context.Attach(filmToUpdate);
                     if (filmToUpdate != null)
                     {
                         if (filmToUpdate.RegularDiscountId != null)
@@ -389,7 +424,9 @@ namespace EF_project
             {
                 if (EnsureUserIsAdmin(user))
                 {
-                    var filmToUpdate = context.Films.FirstOrDefault(f => f.Name == film.Name);
+                    var filmToUpdate = context.Films
+                        .Include(f => f.RegularDiscount)
+                        .FirstOrDefault(f => f.Id == film.Id);
                     if (filmToUpdate != null)
                     {
                         if (filmToUpdate.RegularDiscount != null)
@@ -554,6 +591,8 @@ namespace EF_project
                     var ses = context.Sessions
                         .Include(s => s.Hall)
                         .Include(s => s.Tickets)
+                        .Include(s => s.Status)
+                        .Include(s => s.Film)
                         .Where(s => s.Hall.Id == Hallid)
                         .ToList();
 
@@ -624,13 +663,33 @@ namespace EF_project
         {
             using (var context = new AppDbContext())
             {
+                var film = context.Films.FirstOrDefault(f => f.Name == session.Film.Name);
+                var hall = context.Halls.FirstOrDefault(h => h.Id == session.Hall.Id);
+                var status = context.StatusSessions.FirstOrDefault(s => s.Status == session.Status.Status);
+
+                if (film == null || hall == null || status == null)
+                {
+                    Console.WriteLine("Something went wrong");
+                    return;
+                }
+
                 if (EnsureUserIsAdmin(user))
                 {
-                    context.Sessions.Add(session);
+                    var newSession = new Session
+                    {
+                        Film = film,
+                        Hall = hall,
+                        Status = status,
+                        StartTime = session.StartTime,
+                        Price = session.Price
+                    };
+
+                    context.Sessions.Add(newSession);
                     context.SaveChanges();
                 }
             }
         }
+
 
         public void RemoveSession(Session session, User user)
         {
@@ -676,20 +735,23 @@ namespace EF_project
         {
             using (var context = new AppDbContext())
             {
-                var sessions = context.Sessions.Include(s => s.Film)
+                var sessions = context.Sessions
+                    .Include(s => s.Film)
                     .Include(s => s.Hall)
                     .Include(s => s.Status)
-                    .Where(s => s.Film.Name == filmname && s.Status.Status == "Planed")
                     .ToArray();
-                
-                if (sessions.Length == 0)
+                //.Where(s => s.Film.Name == filmname && s.Status.Status == "Planed")
+                //.ToArray();
+                var ses = sessions.Where(s => s.Film.Name == filmname && s.Status.Status == "Planned").ToArray();
+
+                if (ses.Length == 0)
                 {
                     Console.WriteLine("No sessions found");
                     return null;
                 }
                 else
                 {
-                    return sessions;
+                    return ses;
                 }
             }
         }
@@ -700,7 +762,11 @@ namespace EF_project
             {
                 if (EnsureUserIsAdmin(user))
                 {
-                    s.Status = status;
+                    var st = context.StatusSessions.FirstOrDefault(s => s.Status == status.Status);
+                    var session = context.Sessions.FirstOrDefault(ses => ses.Id == s.Id);
+
+                    if(st != null)
+                        session.Status = st;
                     context.SaveChanges();
                 }
             }
@@ -731,6 +797,13 @@ namespace EF_project
         {
             using (var context = new AppDbContext())
             {
+                context.Attach(ticket.Session);
+                context.Attach(ticket.Session.Film);
+                context.Attach(ticket.Session.Hall);
+                context.Attach(ticket.Session.Status);
+                if(ticket.Status != null)
+                    context.Attach(ticket.Status);
+
                 if (EnsureUserIsAdmin(user))
                 {
                     context.Tickets.Add(ticket);
@@ -781,7 +854,7 @@ namespace EF_project
         {
             using (var context = new AppDbContext())
             {
-                var ticket = context.Tickets.FirstOrDefault(t => t.Id == id);
+                var ticket = context.Tickets.Include(t => t.Status).FirstOrDefault(t => t.Id == id);
                 if (ticket != null)
                 {
                     return ticket;
@@ -811,6 +884,30 @@ namespace EF_project
             }
         }
 
+        public List<Ticket> GetTicketsBySession(Session session)
+        {
+            using (var context = new AppDbContext())
+            {
+                var tick = context.Tickets
+                    .Include(t => t.Session)
+                    .Include(t => t.Status)
+                    //.Where(t => t.Session.Id == session.Id && (t.Status == null || t.Status.Status == "Returned"))
+                    .ToList();
+
+                var tickets = tick.Where(t => t.Session.Id == session.Id && (t.Status == null || t.Status.Status == "Returned")).ToList();
+
+                if (tickets.Count == 0)
+                {
+                    Console.WriteLine("No tickets found");
+                    return null;
+                }
+                else
+                {
+                    return tickets;
+                }
+            }
+        }
+
         #endregion
 
         #region Add/Remove/Update Sales
@@ -819,6 +916,7 @@ namespace EF_project
         {
             using (var context = new AppDbContext())
             {
+                context.Attach(sale.User);
                 context.Sales.Add(sale);
                 context.SaveChanges();
             }

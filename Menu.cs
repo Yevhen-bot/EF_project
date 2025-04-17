@@ -29,7 +29,7 @@
 
         public static void PrintOrderMenu()
         {
-            Console.WriteLine("0 - add ticket to item list, 1 - return ticket, 2 - make an order, 3 - see profit");
+            Console.WriteLine("0 - add ticket to item list, 1 - return ticket, 2 - make an order, 3 - see profit, 4 - bye bye");
         }
     }
 }
