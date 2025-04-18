@@ -5,6 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using EF_project.Entitty;
+using Microsoft.Extensions.Logging;
 
 namespace EF_project.Data
 {

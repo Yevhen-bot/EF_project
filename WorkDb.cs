@@ -686,6 +686,8 @@ namespace EF_project
 
                     context.Sessions.Add(newSession);
                     context.SaveChanges();
+
+                    session.Id = newSession.Id;
                 }
             }
         }
